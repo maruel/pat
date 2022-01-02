@@ -106,7 +106,7 @@ jobs:
       # Fetch the tools.
     - name: 'go get necessary tools'
       if: always()
-      run: >
+      run: |
         go install github.com/gordonklaus/ineffassign@latest
         go install github.com/securego/gosec/cmd/gosec@latest
         go install golang.org/x/lint/golint@latest
@@ -114,7 +114,7 @@ jobs:
         go install honnef.co/go/tools/cmd/staticcheck@latest
     - name: 'go get necessary tools (ubuntu)'
       if: always() && matrix.os == 'ubuntu-latest'
-      run: >
+      run: |
         go install github.com/client9/misspell/cmd/misspell@latest
         go install github.com/google/addlicense@latest
 
