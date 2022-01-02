@@ -210,13 +210,6 @@ func printAnnotated(w io.Writer, d []*disasmSym) {
 				fmt.Fprintf(w, "%d  %s%s%s\n", c.srcLine, ansi.ColorCode("yellow+h+b"), l, ansi.Reset)
 			}
 
-			// Process the decoded line.
-			// Colors:
-			// - Green:  calls/returns
-			// - Red:    traps (UD2)
-			// - Blue:   jumps (both conditional and unconditional)
-			// - Violet: padding/nops
-			// - Yellow: function name
 			color := ""
 			if c.instr == "CALL" || c.instr == "RET" {
 				if strings.HasPrefix(c.arg, "runtime.panicIndex") {
@@ -310,6 +303,13 @@ func mainImpl() error {
 		fmt.Printf("\n")
 		fmt.Printf("disfunc prints out an annotated function.\n")
 		fmt.Printf("It is recommended to use one of -f or -file.\n")
+		fmt.Printf("\n")
+		fmt.Printf("Colors:\n")
+		fmt.Printf("- Green:  calls/returns\n")
+		fmt.Printf("- Red:    panic() due to bound checking and traps\n")
+		fmt.Printf("- Blue:   jumps (both conditional and unconditional)\n")
+		fmt.Printf("- Violet: padding and noops\n")
+		fmt.Printf("- Yellow: source code; bound check highlighted red\n")
 		fmt.Printf("\n")
 		fmt.Printf("example:\n")
 		fmt.Printf("  disfunc -f 'nin\\.CanonicalizePath$' -pkg ./cmd/nin | less -R\n")

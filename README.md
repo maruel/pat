@@ -4,12 +4,28 @@ Performance Analysis Toolbox for Go programs.
 
 ## Usage
 
+Get with:
+
 ```
 go install github.com/maruel/pat/cmd/...@latest
+```
 
-# Print all the slice boundary checks in file util.go by building ./cmd/nin:
-boundcheck -pkg ./cmd/nin -file util.go
+## disfunc
 
-# Disassemble nin.CanonicalizePath() when building ./cmd/nin:
+Disassemble a function at the command line with source annotation.
+
+Example: disassemble function nin.CanonicalizePath() when building ./cmd/nin:
+
+```
 disfunc -f 'nin\.CanonicalizePath$' -pkg ./cmd/nin
 ```
+
+Colors:
+
+- Green:  calls/returns
+- Red:    panic() due to bound checking and traps
+- Blue:   jumps (both conditional and unconditional)
+- Violet: padding and noops
+- Yellow: source code; bound check highlighted red
+
+![screenshot](https://github.com/maruel/pat/wiki/disfunc.png)
