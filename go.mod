@@ -1,4 +1,4 @@
-module github.com/maruel/pa
+module github.com/maruel/pat
 
 go 1.17
 
