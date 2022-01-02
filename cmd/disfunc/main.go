@@ -22,21 +22,25 @@ import (
 	"github.com/mgutz/ansi"
 )
 
-type disamLine struct {
-	file      string
-	srcLine   int
-	binOffset int
-	asm       string
-	decoded   string
-	instr     string
-	arg       string
-	alias     string
+type disasmLine struct {
+	index     int
+	file      string // util.go
+	fileSrc   string // util.go:123
+	srcLine   int    // 123
+	binOffset int    // Binary offset from the start of the executable
+	symOffset int    // Binary offset from the start of the symbol
+	asm       string // raw bytes
+	decoded   string // full decoded instruction
+	instr     string // only the instruction
+	arg       string // only arguments
+	alias     string // processed arguments, when applicable
 }
 
 type disasmSym struct {
-	file    string
-	symbol  string
-	content []*disamLine
+	file      string
+	symbol    string
+	binOffset int // Binary offset from the start of the executable
+	content   []*disasmLine
 }
 
 func getDisasm(pkg, bin, filter, file string) ([]*disasmSym, error) {
@@ -56,9 +60,11 @@ func getDisasm(pkg, bin, filter, file string) ([]*disasmSym, error) {
 
 	var out []*disasmSym
 	const textPrefix = "TEXT "
-	m := map[int]string{}
+	m := map[int]*disasmLine{}
+	index := 0
 	for _, l := range strings.Split(string(disasmOut), "\n") {
 		if l == "" {
+			index = 0
 			continue
 		}
 		if strings.HasPrefix(l, textPrefix) {
@@ -72,6 +78,7 @@ func getDisasm(pkg, bin, filter, file string) ([]*disasmSym, error) {
 				symbol: f[0],
 			}
 			out = append(out, d)
+			index = 0
 			continue
 		}
 		if !strings.HasPrefix(l, "  ") || len(out) == 0 {
@@ -104,28 +111,35 @@ func getDisasm(pkg, bin, filter, file string) ([]*disasmSym, error) {
 			instr = decoded[:j]
 			arg = decoded[j+1:]
 		}
-		a := &disamLine{
+		if len(d.content) == 0 {
+			d.binOffset = int(binOffset)
+		}
+		a := &disasmLine{
+			index:     index,
 			file:      f,
+			fileSrc:   fileSrc,
 			srcLine:   srcLine,
 			binOffset: int(binOffset),
+			symOffset: int(binOffset) - d.binOffset,
 			asm:       asm,
 			decoded:   decoded,
 			instr:     instr,
 			arg:       arg,
 		}
 		d.content = append(d.content, a)
-		m[int(binOffset)] = fileSrc
+		m[int(binOffset)] = a
+		index++
 	}
 
 	// After parsing everything, resolve the address of the jumps. Do this before
 	// filtering just in case.
 	for _, s := range out {
 		for _, c := range s.content {
+			// For any Jxx instruction, try to resolve the destination.
 			if c.instr[0] == 'J' {
-				b, err := strconv.ParseInt(c.arg, 0, 0)
-				if err == nil {
-					if dst := m[int(b)]; dst != "" {
-						c.alias = dst
+				if b, err := strconv.ParseInt(c.arg, 0, 0); err == nil {
+					if dst := m[int(b)]; dst != nil {
+						c.alias = fmt.Sprintf("%s (%d)", dst.fileSrc, dst.index)
 					}
 				}
 			}
@@ -146,6 +160,7 @@ func getDisasm(pkg, bin, filter, file string) ([]*disasmSym, error) {
 }
 
 func printAnnotated(w io.Writer, d []*disasmSym) {
+	// Order blocks per file then per symbols.
 	sort.Slice(d, func(i, j int) bool {
 		x := d[i]
 		y := d[j]
@@ -154,6 +169,7 @@ func printAnnotated(w io.Writer, d []*disasmSym) {
 		}
 		return x.symbol < y.symbol
 	})
+
 	for _, s := range d {
 		d, err := ioutil.ReadFile(s.file)
 		if err != nil {
@@ -165,15 +181,33 @@ func printAnnotated(w io.Writer, d []*disasmSym) {
 
 		// Reorder by line numbers to make it more easy to understand.
 		sort.Slice(s.content, func(i, j int) bool {
-			return s.content[i].srcLine < s.content[j].srcLine
+			if s.content[i].srcLine != s.content[j].srcLine {
+				return s.content[i].srcLine < s.content[j].srcLine
+			}
+			return s.content[i].index < s.content[j].index
 		})
 
 		lastLine := 0
-		for _, c := range s.content {
+		for i, c := range s.content {
 			if c.srcLine != lastLine {
-				// Print the source line.
-				fmt.Fprintf(w, "%d  %s%s%s\n", c.srcLine, ansi.ColorCode("yellow+h+b"), shorten(lines[c.srcLine-1]), ansi.Reset)
+				// Print the source line. But first check if there's any panic before
+				// the next block to highlight the line.
 				lastLine = c.srcLine
+				found := false
+				for _, c2 := range s.content[i:] {
+					if c2.srcLine != lastLine {
+						break
+					}
+					if c2.instr == "CALL" && strings.HasPrefix(c2.arg, "runtime.panicIndex") {
+						found = true
+						break
+					}
+				}
+				l := shorten(lines[c.srcLine-1])
+				if found {
+					l = highlightBracket(l)
+				}
+				fmt.Fprintf(w, "%d  %s%s%s\n", c.srcLine, ansi.ColorCode("yellow+h+b"), l, ansi.Reset)
 			}
 
 			// Process the decoded line.
@@ -185,7 +219,11 @@ func printAnnotated(w io.Writer, d []*disasmSym) {
 			// - Yellow: function name
 			color := ""
 			if c.instr == "CALL" || c.instr == "RET" {
-				color = ansi.LightGreen
+				if strings.HasPrefix(c.arg, "runtime.panicIndex") {
+					color = ansi.ColorCode("red+b")
+				} else {
+					color = ansi.LightGreen
+				}
 			} else if strings.HasPrefix(c.instr, "J") {
 				color = ansi.LightBlue
 			} else if c.instr == "UD2" {
@@ -194,12 +232,13 @@ func printAnnotated(w io.Writer, d []*disasmSym) {
 				// Technically it should be INT 3
 				color = ansi.LightMagenta
 			}
-			if c.alias != "" {
-				fmt.Fprintf(w, "  %s%-5s %s%s\n", color, c.instr, c.alias, ansi.Reset)
-			} else if c.arg != "" {
-				fmt.Fprintf(w, "  %s%-5s %s%s\n", color, c.instr, c.arg, ansi.Reset)
+			if arg := c.arg; arg != "" {
+				if c.alias != "" {
+					arg = c.alias
+				}
+				fmt.Fprintf(w, " %4d %s%-5s %s%s\n", c.index, color, c.instr, arg, ansi.Reset)
 			} else {
-				fmt.Fprintf(w, "  %s%s%s\n", color, c.instr, ansi.Reset)
+				fmt.Fprintf(w, " %4d %s%s%s\n", c.index, color, c.instr, ansi.Reset)
 			}
 
 			// It's very ISA specific, only tested on x64 for now.
@@ -213,6 +252,46 @@ func printAnnotated(w io.Writer, d []*disasmSym) {
 
 func shorten(l string) string {
 	return strings.ReplaceAll(l, "\t", "  ")
+}
+
+func highlightBracket(l string) string {
+	t := ""
+	inQuote := false
+	inDoubleQuote := false
+	inBracket := 0
+	for i := 0; i < len(l); i++ {
+		switch c := l[i]; c {
+		case '[':
+			if !inQuote && !inDoubleQuote {
+				inBracket++
+				if inBracket == 1 {
+					t += ansi.ColorCode("red+b")
+				}
+			}
+			t += string(c)
+		case ']':
+			t += string(c)
+			if !inQuote && !inDoubleQuote {
+				inBracket--
+				if inBracket == 0 {
+					t += ansi.Reset
+				}
+			}
+		case '\'':
+			if !inDoubleQuote {
+				inQuote = !inQuote
+			}
+			t += string(c)
+		case '"':
+			if !inQuote {
+				inDoubleQuote = !inDoubleQuote
+			}
+			t += string(c)
+		default:
+			t += string(c)
+		}
+	}
+	return t
 }
 
 func mainImpl() error {
@@ -233,7 +312,7 @@ func mainImpl() error {
 		fmt.Printf("It is recommended to use one of -f or -file.\n")
 		fmt.Printf("\n")
 		fmt.Printf("example:\n")
-		fmt.Printf("  disfunc -f 'nin\\.CanonicalizePath$' -pkg ./cmd/nin\n")
+		fmt.Printf("  disfunc -f 'nin\\.CanonicalizePath$' -pkg ./cmd/nin | less -R\n")
 		fmt.Printf("\n")
 		flag.PrintDefaults()
 	}
@@ -244,17 +323,6 @@ func mainImpl() error {
 		return err
 	}
 
-	/*
-		if *raw {
-			printRaw(locs, *file)
-			return nil
-		}
-
-		if *terse {
-			printTerse(locs, *file)
-			return nil
-		}
-	*/
 	var w io.Writer = os.Stdout
 	if isatty.IsTerminal(os.Stdout.Fd()) && os.Getenv("TERM") != "dumb" {
 		w = colorable.NewColorableStdout()

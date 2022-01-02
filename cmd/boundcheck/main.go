@@ -85,7 +85,7 @@ func printAnnotated(w io.Writer, locs []loc, file string) {
 		fmt.Fprintf(w, "%s\n", n)
 		for i, l := range m[n] {
 			fmt.Fprintf(w, "% 5d %s\n", l-1, shorten(lines[l-2]))
-			fmt.Fprintf(w, "% 5d %s\n", l, highlight(shorten(lines[l-1])))
+			fmt.Fprintf(w, "% 5d %s\n", l, highlightBracket(shorten(lines[l-1])))
 			fmt.Fprintf(w, "% 5d %s\n", l+1, shorten(lines[l]))
 			if i != 0 {
 				fmt.Fprintf(w, "\n")
@@ -98,7 +98,7 @@ func shorten(l string) string {
 	return strings.ReplaceAll(l, "\t", "  ")
 }
 
-func highlight(l string) string {
+func highlightBracket(l string) string {
 	t := ""
 	inQuote := false
 	inDoubleQuote := false
