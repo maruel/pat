@@ -83,7 +83,7 @@ func printAnnotated(w io.Writer, locs []loc, file string) {
 		}
 		lines := strings.Split(string(d), "\n")
 		fmt.Fprintf(w, "%s\n", n)
-		for i, l := range m[n] {
+		for _, l := range m[n] {
 			fmt.Fprintf(w, "% 5d %s\n", l-1, shorten(lines[l-2]))
 			fmt.Fprintf(w, "% 5d %s\n", l, highlightBracket(shorten(lines[l-1])))
 			fmt.Fprintf(w, "% 5d %s\n", l+1, shorten(lines[l]))
