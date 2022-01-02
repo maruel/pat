@@ -118,7 +118,7 @@ func highlight(l string) string {
 			if !inQuote && !inDoubleQuote {
 				inBracket--
 				if inBracket == 0 {
-					t += ansi.DefaultFG
+					t += ansi.Reset
 				}
 			}
 		case '\'':
@@ -217,7 +217,7 @@ func mainImpl() error {
 	}
 
 	var w io.Writer = os.Stdout
-	if isatty.IsTerminal(os.Stdout.Fd()) {
+	if isatty.IsTerminal(os.Stdout.Fd()) && os.Getenv("TERM") != "dumb" {
 		w = colorable.NewColorableStdout()
 	}
 	printAnnotated(w, locs, *file)
