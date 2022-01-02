@@ -230,7 +230,7 @@ func mainImpl() error {
 		fmt.Printf("usage: disfunc <flags>\n")
 		fmt.Printf("\n")
 		fmt.Printf("disfunc prints out an annotated function.\n")
-		fmt.Printf("It is recommented to use one of -f or -file.\n")
+		fmt.Printf("It is recommended to use one of -f or -file.\n")
 		fmt.Printf("\n")
 		fmt.Printf("example:\n")
 		fmt.Printf("  disfunc -f 'nin\\.CanonicalizePath$' -pkg ./cmd/nin\n")
