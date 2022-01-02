@@ -17,7 +17,7 @@ Disassemble a function at the command line with source annotation.
 Example: disassemble function nin.CanonicalizePath() when building ./cmd/nin:
 
 ```
-disfunc -f 'nin\.CanonicalizePath$' -pkg ./cmd/nin
+disfunc -f 'nin\.CanonicalizePath$' -pkg ./cmd/nin | less -R
 ```
 
 Colors:
@@ -29,3 +29,14 @@ Colors:
 - Yellow: source code; bound check highlighted red
 
 ![screenshot](https://github.com/maruel/pat/wiki/disfunc.png)
+
+## boundcheck
+
+Lists all the bound checks in a source file or package. Useful to do a quick
+audit:
+
+```
+boundcheck -pkg ./cmd/nin | less -R
+```
+
+![screenshot](https://github.com/maruel/pat/wiki/boundcheck.png)
