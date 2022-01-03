@@ -23,26 +23,21 @@ import (
 )
 
 type loc struct {
+	sym  string
 	file string
 	line int
 }
 
-func printRaw(locs []loc, file string) {
+func printRaw(locs []loc) {
 	for _, l := range locs {
-		if file != "" && l.file != file {
-			continue
-		}
 		fmt.Printf("%s:%d\n", l.file, l.line)
 	}
 }
 
-func printTerse(locs []loc, file string) {
+func printTerse(locs []loc) {
 	m := map[string][]int{}
 	var names []string
 	for _, l := range locs {
-		if file != "" && l.file != file {
-			continue
-		}
 		if _, ok := m[l.file]; !ok {
 			names = append(names, l.file)
 		}
@@ -61,17 +56,14 @@ func printTerse(locs []loc, file string) {
 	}
 }
 
-func printAnnotated(w io.Writer, locs []loc, file string) {
-	m := map[string][]int{}
+func printAnnotated(w io.Writer, locs []loc) {
+	m := map[string][]loc{}
 	var names []string
 	for _, l := range locs {
-		if file != "" && l.file != file {
-			continue
-		}
 		if _, ok := m[l.file]; !ok {
 			names = append(names, l.file)
 		}
-		m[l.file] = append(m[l.file], l.line)
+		m[l.file] = append(m[l.file], l)
 	}
 	sort.Strings(names)
 
@@ -81,12 +73,18 @@ func printAnnotated(w io.Writer, locs []loc, file string) {
 			// Silently ignore files for now.
 			continue
 		}
+		sym := ""
 		lines := strings.Split(string(d), "\n")
 		fmt.Fprintf(w, "%s\n", n)
 		for _, l := range m[n] {
-			fmt.Fprintf(w, "% 5d %s\n", l-1, shorten(lines[l-2]))
-			fmt.Fprintf(w, "% 5d %s\n", l, highlightBracket(shorten(lines[l-1])))
-			fmt.Fprintf(w, "% 5d %s\n", l+1, shorten(lines[l]))
+			id := l.line
+			if l.sym != sym {
+				sym = l.sym
+				fmt.Fprintf(w, "; %s\n", sym)
+			}
+			fmt.Fprintf(w, "% 5d %s\n", id-1, shorten(lines[id-2]))
+			fmt.Fprintf(w, "% 5d %s\n", id, highlightBracket(shorten(lines[id-1])))
+			fmt.Fprintf(w, "% 5d %s\n", id+1, shorten(lines[id]))
 			fmt.Fprintf(w, "\n")
 		}
 	}
@@ -136,7 +134,7 @@ func highlightBracket(l string) string {
 	return t
 }
 
-func getLocs(pkg, bin, filter string) ([]loc, error) {
+func getLocs(pkg, bin, filter, file string) ([]loc, error) {
 	if err := exec.Command("go", "build", "-o", bin, pkg).Run(); err != nil {
 		return nil, err
 	}
@@ -152,7 +150,13 @@ func getLocs(pkg, bin, filter string) ([]loc, error) {
 	}
 
 	var locs []loc
+	sym := ""
+	const textPrefix = "TEXT "
 	for _, l := range strings.Split(string(disasmOut), "\n") {
+		if strings.HasPrefix(l, textPrefix) {
+			f := strings.SplitN(l[len(textPrefix):], " ", 2)
+			sym = f[0]
+		}
 		if strings.Contains(l, "CALL runtime.panicIndex") {
 			l = strings.TrimSpace(l)
 			i := strings.IndexByte(l, ':')
@@ -161,9 +165,19 @@ func getLocs(pkg, bin, filter string) ([]loc, error) {
 			if err != nil {
 				return nil, err
 			}
-			locs = append(locs, loc{l[:i], n})
+			locs = append(locs, loc{sym, l[:i], n})
 		}
 	}
+	if file != "" {
+		for i := 0; i < len(locs); i++ {
+			if locs[i].file != file {
+				copy(locs[i:], locs[i+1:])
+				locs = locs[:len(locs)-1]
+				i--
+			}
+		}
+	}
+
 	sort.Slice(locs, func(i, j int) bool {
 		x := locs[i]
 		y := locs[j]
@@ -199,18 +213,18 @@ func mainImpl() error {
 	}
 	flag.Parse()
 
-	locs, err := getLocs(*pkg, *bin, *filter)
+	locs, err := getLocs(*pkg, *bin, *filter, *file)
 	if err != nil {
 		return err
 	}
 
 	if *raw {
-		printRaw(locs, *file)
+		printRaw(locs)
 		return nil
 	}
 
 	if *terse {
-		printTerse(locs, *file)
+		printTerse(locs)
 		return nil
 	}
 
@@ -218,7 +232,7 @@ func mainImpl() error {
 	if isatty.IsTerminal(os.Stdout.Fd()) && os.Getenv("TERM") != "dumb" {
 		w = colorable.NewColorableStdout()
 	}
-	printAnnotated(w, locs, *file)
+	printAnnotated(w, locs)
 	return nil
 }
 
