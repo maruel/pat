@@ -10,6 +10,11 @@ Get with:
 go install github.com/maruel/pat/cmd/...@latest
 ```
 
+## ba
+
+ba benches against a base git commit, providing more stable benchmark
+measurements in a one command tool.
+
 ## disfunc
 
 Disassemble a function at the command line with source annotation.
