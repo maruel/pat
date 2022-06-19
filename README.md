@@ -2,6 +2,9 @@
 
 Performance Analysis Toolbox for Go programs.
 
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/maruel/pat)](https://pkg.go.dev/github.com/maruel/pat)
+[![codecov](https://codecov.io/gh/maruel/pat/branch/main/graph/badge.svg?token=UNE311HJM8)](https://codecov.io/gh/maruel/pat)
+
 ## Usage
 
 Get with:
