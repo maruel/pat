@@ -57,7 +57,7 @@ jobs:
       if: always()
       run: rm coverage.txt
     - name: 'Check: go test -race'
-      run: go test -timeout=60s -race ./...
+      run: go test -timeout=120s -race ./...
     - name: 'Check: benchmark 📈'
       run: ba -a HEAD~1
     - name: 'Check: go test (32 bits, short)'
