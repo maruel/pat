@@ -60,11 +60,15 @@ jobs:
       run: go test -timeout=120s -race ./...
     - name: 'Check: benchmark 📈'
       run: ba -a HEAD~1
-    - name: 'Check: go test (32 bits, short)'
+    - name: 'Check: go test -short (CGO_ENABLED=0)'
+      env:
+        CGO_ENABLED: 0
+      run: go test -timeout=120s -short ./...
+    - name: 'Check: go test -short (32 bits)'
       if: matrix.os != 'macos-latest'
       env:
         GOARCH: 386
-      run: go test -timeout=40s -short ./...
+      run: go test -timeout=120s -short ./...
     - name: "Check: tree is clean"
       if: always()
       run: |
@@ -155,7 +159,7 @@ jobs:
       if: always() && matrix.os == 'ubuntu-latest'
       run: |
         if find . -path ./.git -prune -o -type f -executable -print | grep -e . ; then
-          echo 'Do not commit executables beside shell scripts'
+          echo 'Do not commit executables'
           false
         fi
     - name: 'Check: addlicense; all sources have a license header (ubuntu)'
@@ -228,6 +232,33 @@ jobs:
           git diff
           false
         fi
+
+
+    # Ensure tests pass on oldest supported Go version.
+  old:
+    name: "test: go${{matrix.gover}}/${{matrix.os}}"
+    runs-on: "${{matrix.os}}"
+    continue-on-error: true
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        gover: ['1.13.15']
+    env:
+      PYTHONDONTWRITEBYTECODE: x
+    steps:
+    - name: Turn off git core.autocrlf
+      if: matrix.os == 'windows-latest'
+      run: git config --global core.autocrlf false
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v3
+      with:
+        go-version: "=${{matrix.gover}}"
+    - name: 'Check: go test'
+      run: go test -timeout=120s ./...
 
 
   codeql:
