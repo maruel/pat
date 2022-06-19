@@ -15,9 +15,14 @@ go install github.com/maruel/pat/cmd/...@latest
 
 ## ba
 
-ba benches against a base git commit, providing more stable benchmark
-measurements in a one command tool. Runs the benchmarks multiple times
-automatically. It is designed to be usable as part of github actions.
+`ba` benches against a base git commit, providing more stable benchmark
+measurements. ba leverages
+[golang.org/x/perf/benchstat](https://golang.org/x/perf/benchstat) for benchmark
+performance difference calculation.
+
+It runs the benchmarks multiple times in alternation to reduce the variance
+while taking as little time as possible. It is designed to be usable as part of
+github actions.
 
 Example:
 
