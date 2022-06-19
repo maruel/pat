@@ -57,8 +57,18 @@ jobs:
       run: rm coverage.txt
     - name: 'Check: go test -race'
       run: go test -timeout=60s -race ./...
-    - name: 'Check: go test -bench=.'
-      run: go test -timeout=60s -bench=. -benchtime=100ms -cpu=1  -run NONE ./...
+    - name: 'Check: benchmark'
+      run: |
+        DATA="$(ba -a HEAD~1)"
+        echo "$DATA"
+        #URL=$(cat ${GITHUB_EVENT_PATH} | jq -r .pull_request.comments_url)
+        URL=$(cat ${GITHUB_EVENT_PATH} | jq -r .repository.comments_url)
+        #PAYLOAD=$(echo '{}' | jq --arg body "$DATA" '.body = $body')
+        PAYLOAD="$(echo $DATA | jq -R --slurp '{body: .}')"
+        curl -sS --request POST \
+          --header "Authorization: Bearer ${{secrets.GITHUB_TOKEN}}" \
+          --header "Content-Type: application/json" \
+          --data "${PAYLOAD}" "${URL}" > /dev/null
     - name: 'Check: go test (32 bits, short)'
       if: matrix.os != 'macos-latest'
       env:
@@ -146,6 +156,7 @@ jobs:
       if: always()
       run: staticcheck ./...
     - name: 'Check: gosec'
+      if: always()
       run: gosec -exclude=G204,G304 -fmt=golint -quiet ./...
       # The following checks are not dependent on the OS or go build tags. Only
       # run them on ubuntu-latest since it's the fastest one.
@@ -189,12 +200,15 @@ jobs:
           false
         fi
     - name: 'Send comments'
-      if: failure() && github.event_name == 'pull_request'
+      if: failure()
       run: |
         if [ -f _comments.txt ]; then
-          URL=$(cat ${GITHUB_EVENT_PATH} | jq -r .pull_request.comments_url)
+          #URL=$(cat ${GITHUB_EVENT_PATH} | jq -r .pull_request.comments_url)
+          URL=$(cat ${GITHUB_EVENT_PATH} | jq -r .repository.comments_url)
           echo "Sending $(cat _comments.txt|wc -l) lines of comments to ${URL}"
-          PAYLOAD=$(echo '{}' | jq --arg body "$(cat _comments.txt)" '.body = $body')
+          #PAYLOAD=$(echo '{}' | jq --arg body "$(cat _comments.txt)" '.body = $body')
+          #PAYLOAD=$(echo '{}' | jq --arg body "$DATA" '.body = $body')
+          PAYLOAD="$(cat _comments.txt | jq -R --slurp '{body: .}')"
           curl -sS --request POST \
             --header "Authorization: Bearer ${{secrets.GITHUB_TOKEN}}" \
             --header "Content-Type: application/json" \

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -100,7 +101,7 @@ func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Du
 	return oldStats, newStats, nil
 }
 
-func printBenchstat(o, n string) error {
+func printBenchstat(w io.Writer, o, n string) error {
 	c := &benchstat.Collection{
 		Alpha:      0.05,
 		AddGeoMean: false,
@@ -113,10 +114,8 @@ func printBenchstat(o, n string) error {
 	if err := c.AddFile("HEAD", strings.NewReader(n)); err != nil {
 		return err
 	}
-	buf := bytes.Buffer{}
-	benchstat.FormatText(&buf, c.Tables())
-	_, err := os.Stdout.Write(buf.Bytes())
-	return err
+	benchstat.FormatText(w, c.Tables())
+	return nil
 }
 
 func mainImpl() error {
@@ -145,7 +144,12 @@ func mainImpl() error {
 		return err
 	}
 
-	return printBenchstat(oldStats, newStats)
+	buf := bytes.Buffer{}
+	if err = printBenchstat(&buf, oldStats, newStats); err != nil {
+		return err
+	}
+	_, err = os.Stdout.Write(buf.Bytes())
+	return err
 }
 
 func main() {
