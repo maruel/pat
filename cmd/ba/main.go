@@ -58,7 +58,10 @@ func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Du
 		return "", "", err
 	}
 	if branch == "HEAD" {
-		return "", "", errors.New("checkout a branch first")
+		// We're in detached head. It's fine, just save the head.
+		if branch, err = git("rev-parse", "HEAD"); err != nil {
+			return "", "", err
+		}
 	}
 	// Make sure the tree is checked out and pristine, otherwise we could loose the checkout.
 	diff, err := git("status", "--porcelain")
