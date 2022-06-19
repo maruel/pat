@@ -19,7 +19,7 @@ ba benches against a base git commit, providing more stable benchmark
 measurements in a one command tool. Runs the benchmarks multiple times
 automatically. It is designed to be usable as part of github actions.
 
-Example of a function micro-optimization:
+Example:
 
 ```
 $ ba -a HEAD~1
