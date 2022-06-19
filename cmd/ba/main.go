@@ -37,7 +37,10 @@ func bench(ctx context.Context, pkg, b string, duration time.Duration, count int
 		"-cpu",
 		"1",
 	}
-	fmt.Printf("go %s\n", strings.Join(args, " "))
+	if pkg != "" {
+		args = append(args, pkg)
+	}
+	fmt.Fprintf(os.Stderr, "go %s\n", strings.Join(args, " "))
 	out, err := exec.CommandContext(ctx, "go", args...).CombinedOutput()
 	return string(out), err
 }
@@ -99,7 +102,7 @@ func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Du
 		}
 		newStats += out
 
-		fmt.Printf("Checking out %s\n", against)
+		fmt.Fprintf(os.Stderr, "Checking out %s\n", against)
 		if out, err = git("checkout", "-q", against); err != nil {
 			return "", "", fmt.Errorf(out)
 		}
@@ -108,7 +111,7 @@ func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Du
 			return "", "", err
 		}
 		oldStats += out
-		fmt.Printf("Checking out %s\n", branch)
+		fmt.Fprintf(os.Stderr, "Checking out %s\n", branch)
 		if out, err = git("checkout", "-q", branch); err != nil {
 			return "", "", fmt.Errorf(out)
 		}
@@ -148,15 +151,18 @@ func mainImpl() error {
 	duration := flag.Duration("d", 100*time.Millisecond, "duration of each benchmark")
 	series := flag.Int("s", 2, "series to run the benchmark")
 	flag.Usage = func() {
-		fmt.Printf("usage: ba <flags>\n")
-		fmt.Printf("\n")
-		fmt.Printf("ba (benches against) run benchmarks on two different commits and\n")
-		fmt.Printf("prints out the result with benchstat.\n")
-		fmt.Printf("\n")
+		fmt.Fprintf(os.Stderr, "usage: ba <flags>\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "ba (benches against) run benchmarks on two different commits and\n")
+		fmt.Fprintf(os.Stderr, "prints out the result with benchstat.\n")
+		fmt.Fprintf(os.Stderr, "\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-
+	if flag.NArg() != 0 {
+		fmt.Fprintf(os.Stderr, "error: unexpected argument.\n")
+		os.Exit(1)
+	}
 	ctx := context.Background()
 	oldStats, newStats, err := runBenchmarks(ctx, *against, *pkg, *b, *duration, *count, *series)
 	if err != nil {
