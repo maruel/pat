@@ -6,16 +6,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/perf/benchstat"
 )
 
 func git(args ...string) (string, error) {
@@ -52,22 +54,8 @@ func run(c string, args ...string) error {
 	return cmd.Run()
 }
 
-func writeTemp(c string) (string, error) {
-	f, err := ioutil.TempFile("", "ba")
-	if err != nil {
-		return "", err
-	}
-	if _, err = f.WriteString(c); err != nil {
-		_ = f.Close()
-		_ = os.Remove(f.Name())
-		return "", err
-	}
-	if err = f.Close(); err != nil {
-		return "", err
-	}
-	return f.Name(), nil
-}
-
+// runBenchmarks runs benchmarks and return the go test -bench=. result for
+// (old, new) where old is `against` and new is HEAD.
 func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Duration, count, series int) (string, string, error) {
 	// Make sure we'll be able to check the commit back.
 	branch, err := git("rev-parse", "--abbrev-ref", "HEAD")
@@ -119,28 +107,23 @@ func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Du
 	return oldStats, newStats, nil
 }
 
-func runBenchstat(o, n string) error {
-	// Make sure benchstat is available before starting, if not install it.
-	if out, _ := exec.Command("benchstat", "-help").CombinedOutput(); !strings.HasPrefix(string(out), "usage: benchstat [options] old.txt [new.txt] [more.txt ...]") {
-		if err := run("go", "install", "golang.org/x/perf/cmd/benchstat@latest"); err != nil {
-			return err
-		}
+func printBenchstat(o, n string) error {
+	c := &benchstat.Collection{
+		Alpha:      0.05,
+		AddGeoMean: false,
+		DeltaTest:  benchstat.UTest,
 	}
-	of, err := writeTemp(o)
-	if err != nil {
+	// benchstat assumes that old must be first!
+	if err := c.AddFile("HEAD~1", strings.NewReader(o)); err != nil {
 		return err
 	}
-	defer os.Remove(of)
-	nf, err := writeTemp(n)
-	if err != nil {
+	if err := c.AddFile("HEAD", strings.NewReader(n)); err != nil {
 		return err
 	}
-	defer os.Remove(nf)
-	// TODO(maruel): Take the output and color it.
-	if err = run("benchstat", of, nf); err != nil {
-		return err
-	}
-	return nil
+	buf := bytes.Buffer{}
+	benchstat.FormatText(&buf, c.Tables())
+	_, err := os.Stdout.Write(buf.Bytes())
+	return err
 }
 
 func mainImpl() error {
@@ -169,7 +152,7 @@ func mainImpl() error {
 		return err
 	}
 
-	return runBenchstat(oldStats, newStats)
+	return printBenchstat(oldStats, newStats)
 }
 
 func main() {
