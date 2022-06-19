@@ -14,6 +14,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
 	"time"
@@ -74,31 +75,45 @@ func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Du
 	// TODO(maruel): When a benchmark takes more than duration*count, reduce its count to 1.
 	oldStats := ""
 	newStats := ""
+	needRevert := false
 	for i := 0; i < series; i++ {
 		if ctx.Err() != nil {
+			// Don't error out, just quit.
 			break
 		}
-		out, err := bench(ctx, pkg, b, duration, count)
+		out := ""
+		out, err = bench(ctx, pkg, b, duration, count)
 		if err != nil {
-			return "", "", err
+			break
 		}
 		newStats += out
 
 		fmt.Fprintf(os.Stderr, "Checking out %s\n", against)
+		needRevert = true
 		if out, err = git("checkout", "-q", against); err != nil {
-			return "", "", fmt.Errorf(out)
+			err = fmt.Errorf(out)
+			break
 		}
 		out, err = bench(ctx, pkg, b, duration, count)
 		if err != nil {
-			return "", "", err
+			break
 		}
 		oldStats += out
 		fmt.Fprintf(os.Stderr, "Checking out %s\n", branch)
 		if out, err = git("checkout", "-q", branch); err != nil {
-			return "", "", fmt.Errorf(out)
+			err = fmt.Errorf(out)
+			break
+		}
+		needRevert = false
+	}
+	if needRevert {
+		fmt.Fprintf(os.Stderr, "Checking out %s\n", branch)
+		out := ""
+		if out, err = git("checkout", "-q", branch); err != nil {
+			err = fmt.Errorf(out)
 		}
 	}
-	return oldStats, newStats, nil
+	return oldStats, newStats, err
 }
 
 func printBenchstat(w io.Writer, o, n string) error {
@@ -138,17 +153,23 @@ func mainImpl() error {
 		fmt.Fprintf(os.Stderr, "error: unexpected argument.\n")
 		os.Exit(1)
 	}
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt)
+	go func() {
+		<-ch
+		cancel()
+	}()
 	oldStats, newStats, err := runBenchmarks(ctx, *against, *pkg, *b, *duration, *count, *series)
-	if err != nil {
-		return err
-	}
 
 	buf := bytes.Buffer{}
-	if err = printBenchstat(&buf, oldStats, newStats); err != nil {
-		return err
+	if err2 := printBenchstat(&buf, oldStats, newStats); err2 != nil {
+		return err2
 	}
-	_, err = os.Stdout.Write(buf.Bytes())
+	if _, err2 := os.Stdout.Write(buf.Bytes()); err2 != nil {
+		return err2
+	}
 	return err
 }
 
