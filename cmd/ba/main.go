@@ -47,13 +47,6 @@ func bench(ctx context.Context, pkg, b string, duration time.Duration, count int
 	return string(out), err
 }
 
-func run(c string, args ...string) error {
-	cmd := exec.Command(c, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
 // runBenchmarks runs benchmarks and return the go test -bench=. result for
 // (old, new) where old is `against` and new is HEAD.
 func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Duration, count, series int) (string, string, error) {
