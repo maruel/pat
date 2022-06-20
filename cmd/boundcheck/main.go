@@ -68,6 +68,7 @@ func printAnnotated(w io.Writer, locs []loc) {
 	sort.Strings(names)
 
 	for _, n := range names {
+		/* #nosec G304 */
 		d, err := ioutil.ReadFile(n)
 		if err != nil {
 			// Silently ignore files for now.

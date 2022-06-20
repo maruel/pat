@@ -41,6 +41,7 @@ func runBench(ctx context.Context, pkg, bench string, benchtime time.Duration, c
 		args = append(args, pkg)
 	}
 	fmt.Fprintf(os.Stderr, "go %s\n", strings.Join(args, " "))
+	/* #nosec G204 */
 	out, err := exec.CommandContext(ctx, "go", args...).CombinedOutput()
 	return string(out), err
 }
@@ -130,7 +131,7 @@ func runBenchmarks(ctx context.Context, against, pkg, bench string, benchtime ti
 	// This is particularly problematic with benchmarks lasting less than 100ns
 	// per operation as they fail to be numerically stable and deviate by ~3%.
 	if !nowarm {
-		if err := warmBench(ctx, branch, against, pkg, bench, benchtime); err != nil {
+		if err = warmBench(ctx, branch, against, pkg, bench, benchtime); err != nil {
 			return "", "", err
 		}
 	}
@@ -205,6 +206,8 @@ func mainImpl() error {
 	pkg := flag.String("pkg", "./...", "package to bench")
 	bench := flag.String("bench", ".", "benchmark to run, default to all")
 	against := flag.String("against", "origin/main", "commitref to benchmark against")
+	// TODO(maruel): Remove in v0.0.5.
+	a := flag.String("a", "", "")
 	benchtime := flag.Duration("benchtime", 100*time.Millisecond, "duration of each benchmark")
 	count := flag.Int("count", 2, "count to run per attempt")
 	series := flag.Int("series", 3, "series to run the benchmark")
@@ -223,6 +226,9 @@ func mainImpl() error {
 	flag.Parse()
 	if flag.NArg() != 0 {
 		return errors.New("unexpected argument")
+	}
+	if *a != "" {
+		*against = *a
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
