@@ -158,10 +158,10 @@ func printBenchstat(w io.Writer, o, n string) error {
 func mainImpl() error {
 	pkg := flag.String("pkg", "./...", "package to bench")
 	b := flag.String("b", ".", "benchmark to run, default to all")
-	count := flag.Int("c", 5, "count to run per attempt")
+	count := flag.Int("c", 2, "count to run per attempt")
 	against := flag.String("a", "origin/main", "commitref to benchmark against")
 	duration := flag.Duration("d", 100*time.Millisecond, "duration of each benchmark")
-	series := flag.Int("s", 2, "series to run the benchmark")
+	series := flag.Int("s", 3, "series to run the benchmark")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: ba <flags>\n")
 		fmt.Fprintf(os.Stderr, "\n")
