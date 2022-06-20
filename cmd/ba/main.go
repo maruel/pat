@@ -51,7 +51,7 @@ func bench(ctx context.Context, pkg, b string, duration time.Duration, count int
 
 // runBenchmarks runs benchmarks and return the go test -bench=. result for
 // (old, new) where old is `against` and new is HEAD.
-func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Duration, count, series int) (string, string, error) {
+func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Duration, count, series int, nowarm bool) (string, string, error) {
 	// Make sure the tree is checked out and pristine, otherwise we could loose the checkout.
 	diff, err := git("status", "--porcelain")
 	if err != nil {
@@ -97,6 +97,29 @@ func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Du
 	oldStats := ""
 	newStats := ""
 	needRevert := false
+	if !nowarm {
+		fmt.Fprintf(os.Stderr, "warming up\n")
+		if err = ctx.Err(); err != nil {
+			return "", "", err
+		}
+		if _, err = bench(ctx, pkg, b, duration, 1); err != nil {
+			return "", "", err
+		}
+		fmt.Fprintf(os.Stderr, "git checkout %s\n", against)
+		if out, err2 := git("checkout", "-q", against); err2 == nil {
+			_, err = bench(ctx, pkg, b, duration, 1)
+		} else {
+			err = errors.New(out)
+		}
+		fmt.Fprintf(os.Stderr, "git checkout %s\n", branch)
+		if out, err2 := git("checkout", "-q", branch); err2 != nil {
+			return "", "", errors.New(out)
+		}
+		if err != nil {
+			return "", "", err
+		}
+	}
+
 	fmt.Fprintf(os.Stderr, "%s...%s (%d commits), %s x %d times/batch, batch repeated %d times.\n", branch, against, commits, duration, count, series)
 	for i := 0; i < series; i++ {
 		if ctx.Err() != nil {
@@ -113,7 +136,7 @@ func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Du
 		fmt.Fprintf(os.Stderr, "git checkout %s\n", against)
 		needRevert = true
 		if out, err = git("checkout", "-q", against); err != nil {
-			err = fmt.Errorf(out)
+			err = errors.New(out)
 			break
 		}
 		out, err = bench(ctx, pkg, b, duration, count)
@@ -123,7 +146,7 @@ func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Du
 		oldStats += out
 		fmt.Fprintf(os.Stderr, "git checkout %s\n", branch)
 		if out, err = git("checkout", "-q", branch); err != nil {
-			err = fmt.Errorf(out)
+			err = errors.New(out)
 			break
 		}
 		needRevert = false
@@ -132,7 +155,7 @@ func runBenchmarks(ctx context.Context, against, pkg, b string, duration time.Du
 		fmt.Fprintf(os.Stderr, "Checking out %s\n", branch)
 		out := ""
 		if out, err = git("checkout", "-q", branch); err != nil {
-			err = fmt.Errorf(out)
+			err = errors.New(out)
 		}
 	}
 	return oldStats, newStats, err
@@ -158,10 +181,11 @@ func printBenchstat(w io.Writer, o, n string) error {
 func mainImpl() error {
 	pkg := flag.String("pkg", "./...", "package to bench")
 	b := flag.String("b", ".", "benchmark to run, default to all")
-	count := flag.Int("c", 2, "count to run per attempt")
 	against := flag.String("a", "origin/main", "commitref to benchmark against")
 	duration := flag.Duration("d", 100*time.Millisecond, "duration of each benchmark")
+	count := flag.Int("c", 2, "count to run per attempt")
 	series := flag.Int("s", 3, "series to run the benchmark")
+	nowarm := flag.Bool("nowarm", false, "do not run an extra warmup series")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: ba <flags>\n")
 		fmt.Fprintf(os.Stderr, "\n")
@@ -172,8 +196,7 @@ func mainImpl() error {
 	}
 	flag.Parse()
 	if flag.NArg() != 0 {
-		fmt.Fprintf(os.Stderr, "error: unexpected argument.\n")
-		os.Exit(1)
+		return errors.New("unexpected argument")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -183,7 +206,7 @@ func mainImpl() error {
 		<-ch
 		cancel()
 	}()
-	oldStats, newStats, err := runBenchmarks(ctx, *against, *pkg, *b, *duration, *count, *series)
+	oldStats, newStats, err := runBenchmarks(ctx, *against, *pkg, *b, *duration, *count, *series, *nowarm)
 
 	buf := bytes.Buffer{}
 	if err2 := printBenchstat(&buf, oldStats, newStats); err2 != nil {
