@@ -203,9 +203,12 @@ func printAnnotated(w io.Writer, d []*disasmSym) {
 						break
 					}
 				}
-				l := shorten(lines[c.srcLine-1])
-				if found {
-					l = highlightBracket(l)
+				l := ""
+				if c.srcLine >= 0 && c.srcLine < len(lines) {
+					l = shorten(lines[c.srcLine-1])
+					if found {
+						l = highlightBracket(l)
+					}
 				}
 				fmt.Fprintf(w, "%d  %s%s%s\n", c.srcLine, ansi.ColorCode("yellow+h+b"), l, ansi.Reset)
 			}
@@ -299,21 +302,21 @@ func mainImpl() error {
 	//terse := flag.Bool("terse", false, "terse output")
 	file := flag.String("file", "", "filter on one file")
 	flag.Usage = func() {
-		fmt.Printf("usage: disfunc <flags>\n")
-		fmt.Printf("\n")
-		fmt.Printf("disfunc prints out an annotated function.\n")
-		fmt.Printf("It is recommended to use one of -f or -file.\n")
-		fmt.Printf("\n")
-		fmt.Printf("Colors:\n")
-		fmt.Printf("- Green:  calls/returns\n")
-		fmt.Printf("- Red:    panic() due to bound checking and traps\n")
-		fmt.Printf("- Blue:   jumps (both conditional and unconditional)\n")
-		fmt.Printf("- Violet: padding and noops\n")
-		fmt.Printf("- Yellow: source code; bound check highlighted red\n")
-		fmt.Printf("\n")
-		fmt.Printf("example:\n")
-		fmt.Printf("  disfunc -f 'nin\\.CanonicalizePath$' -pkg ./cmd/nin | less -R\n")
-		fmt.Printf("\n")
+		fmt.Fprintf(os.Stderr, "usage: disfunc <flags>\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "disfunc prints out an annotated function.\n")
+		fmt.Fprintf(os.Stderr, "It is recommended to use one of -f or -file.\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "Colors:\n")
+		fmt.Fprintf(os.Stderr, "- Green:  calls/returns\n")
+		fmt.Fprintf(os.Stderr, "- Red:    panic() due to bound checking and traps\n")
+		fmt.Fprintf(os.Stderr, "- Blue:   jumps (both conditional and unconditional)\n")
+		fmt.Fprintf(os.Stderr, "- Violet: padding and noops\n")
+		fmt.Fprintf(os.Stderr, "- Yellow: source code; bound check highlighted red\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "example:\n")
+		fmt.Fprintf(os.Stderr, "  disfunc -f 'nin\\.CanonicalizePath$' -pkg ./cmd/nin | less -R\n")
+		fmt.Fprintf(os.Stderr, "\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()

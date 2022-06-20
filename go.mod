@@ -1,6 +1,6 @@
 module github.com/maruel/pat
 
-go 1.17
+go 1.15
 
 require (
 	github.com/mattn/go-colorable v0.1.12

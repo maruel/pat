@@ -28,13 +28,13 @@ type loc struct {
 	line int
 }
 
-func printRaw(locs []loc) {
+func printRaw(w io.Writer, locs []loc) {
 	for _, l := range locs {
-		fmt.Printf("%s:%d\n", l.file, l.line)
+		fmt.Fprintf(w, "%s:%d\n", l.file, l.line)
 	}
 }
 
-func printTerse(locs []loc) {
+func printTerse(w io.Writer, locs []loc) {
 	m := map[string][]int{}
 	var names []string
 	for _, l := range locs {
@@ -52,7 +52,7 @@ func printTerse(locs []loc) {
 			}
 			out += strconv.Itoa(l)
 		}
-		fmt.Printf("%s: %s\n", n, out)
+		fmt.Fprintf(w, "%s: %s\n", n, out)
 	}
 }
 
@@ -201,14 +201,14 @@ func mainImpl() error {
 	terse := flag.Bool("terse", false, "terse output")
 	file := flag.String("file", "", "filter on one file")
 	flag.Usage = func() {
-		fmt.Printf("usage: boundcheck <flags>\n")
-		fmt.Printf("\n")
-		fmt.Printf("boundcheck prints out all the lines that the compiler inserted\n")
-		fmt.Printf("a slice bound check in.\n")
-		fmt.Printf("\n")
-		fmt.Printf("example:\n")
-		fmt.Printf("  boundcheck -f nin -pkg ./cmd/nin -file util.go\n")
-		fmt.Printf("\n")
+		fmt.Fprintf(os.Stderr, "usage: boundcheck <flags>\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "boundcheck prints out all the lines that the compiler inserted\n")
+		fmt.Fprintf(os.Stderr, "a slice bound check in.\n")
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "example:\n")
+		fmt.Fprintf(os.Stderr, "  boundcheck -f nin -pkg ./cmd/nin -file util.go\n")
+		fmt.Fprintf(os.Stderr, "\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -219,12 +219,12 @@ func mainImpl() error {
 	}
 
 	if *raw {
-		printRaw(locs)
+		printRaw(os.Stdout, locs)
 		return nil
 	}
 
 	if *terse {
-		printTerse(locs)
+		printTerse(os.Stdout, locs)
 		return nil
 	}
 
