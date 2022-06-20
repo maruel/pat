@@ -29,13 +29,13 @@ Example:
 ```
 $ ba -a HEAD~1
 go test -bench . -benchtime 100ms -count 5 -run ^$ -cpu 1 ./...
-Checking out HEAD~1
+git checkout HEAD~1
 go test -bench . -benchtime 100ms -count 5 -run ^$ -cpu 1 ./...
-Checking out 02152d698f7d548cc86be35a7da3fc0aee93dec1
+git checkout 02152d698f7d548cc86be35a7da3fc0aee93dec1
 go test -bench . -benchtime 100ms -count 5 -run ^$ -cpu 1 ./...
-Checking out HEAD~1
+git checkout HEAD~1
 go test -bench . -benchtime 100ms -count 5 -run ^$ -cpu 1 ./...
-Checking out 02152d698f7d548cc86be35a7da3fc0aee93dec1
+git checkout 02152d698f7d548cc86be35a7da3fc0aee93dec1
 name                  old time/op    new time/op    delta
 HashCommand             69.1ns ± 1%    66.7ns ± 2%  -3.47%  (p=0.000 n=10+10)
 CLParser                 280µs ± 1%     281µs ± 2%    ~     (p=0.739 n=10+10)
