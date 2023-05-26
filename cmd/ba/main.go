@@ -207,15 +207,11 @@ func mainImpl() error {
 	pkg := flag.String("pkg", "./...", "package to bench")
 	bench := flag.String("bench", ".", "benchmark to run, default to all")
 	against := flag.String("against", "origin/main", "commitref to benchmark against")
-	// TODO(maruel): Remove in v0.0.5.
-	a := flag.String("a", "", "")
 	benchtime := flag.Duration("benchtime", 100*time.Millisecond, "duration of each benchmark")
 	count := flag.Int("count", 2, "count to run per attempt")
 	series := flag.Int("series", 3, "series to run the benchmark")
 	// TODO(maruel): This does not seem to help.
 	nowarm := flag.Bool("nowarm", true, "do not run an extra warmup series")
-	// TODO(maruel): This does not seem to help.
-	spin := flag.Duration("spin", 0, "spin the CPU before benchmark to trigger turbo CPU speed")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: ba <flags>\n")
 		fmt.Fprintf(os.Stderr, "\n")
@@ -228,9 +224,6 @@ func mainImpl() error {
 	if flag.NArg() != 0 {
 		return errors.New("unexpected argument")
 	}
-	if *a != "" {
-		*against = *a
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ch := make(chan os.Signal, 1)
@@ -239,10 +232,6 @@ func mainImpl() error {
 		<-ch
 		cancel()
 	}()
-
-	if *spin != 0 {
-		_ = spinCPU(os.Stderr, *spin)
-	}
 
 	oldStats, newStats, err := runBenchmarks(ctx, *against, *pkg, *bench, *benchtime, *count, *series, *nowarm)
 	if err2 := printBenchstat(os.Stdout, oldStats, newStats); err2 != nil {
