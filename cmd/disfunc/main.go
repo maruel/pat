@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -171,7 +170,7 @@ func printAnnotated(w io.Writer, d []*disasmSym) {
 	})
 
 	for _, s := range d {
-		d, err := ioutil.ReadFile(s.file)
+		d, err := os.ReadFile(s.file)
 		if err != nil {
 			fmt.Fprintf(w, "couldn't read %q, skipping\n", s.file)
 			continue

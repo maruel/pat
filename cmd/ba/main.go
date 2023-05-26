@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	// TODO(maruel): Figure this out.
 	"golang.org/x/perf/benchstat"
 )
 

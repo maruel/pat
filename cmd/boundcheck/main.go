@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -69,7 +68,7 @@ func printAnnotated(w io.Writer, locs []loc) {
 
 	for _, n := range names {
 		/* #nosec G304 */
-		d, err := ioutil.ReadFile(n)
+		d, err := os.ReadFile(n)
 		if err != nil {
 			// Silently ignore files for now.
 			continue
