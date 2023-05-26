@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -182,21 +183,84 @@ func runBenchmarks(ctx context.Context, against, pkg, bench string, benchtime ti
 	return oldStats, newStats, err
 }
 
-func printBenchstat(w io.Writer, o, n string) error {
+func genBenchTables(against, head, o, n string) ([]*benchstat.Table, error) {
 	c := &benchstat.Collection{
-		Alpha:      0.05,
-		AddGeoMean: false,
-		DeltaTest:  benchstat.UTest,
+		Alpha:     0.05,
+		DeltaTest: benchstat.UTest,
 	}
 	// benchstat assumes that old must be first!
-	if err := c.AddFile("HEAD~1", strings.NewReader(o)); err != nil {
-		return err
+	if err := c.AddFile(against, strings.NewReader(o)); err != nil {
+		return nil, err
 	}
-	if err := c.AddFile("HEAD", strings.NewReader(n)); err != nil {
-		return err
+	if err := c.AddFile(head, strings.NewReader(n)); err != nil {
+		return nil, err
 	}
-	benchstat.FormatText(w, c.Tables())
+	return c.Tables(), nil
+}
+
+func printBenchstat(w io.Writer, tables []*benchstat.Table) error {
+	benchstat.FormatText(w, tables)
 	return nil
+}
+
+func jsonBenchstat(w io.Writer, tables []*benchstat.Table) error {
+	out := make([]*jsonTable, 0, len(tables))
+	for _, t := range tables {
+		outt := &jsonTable{
+			Metric:  t.Metric,
+			Unit:    t.Rows[0].Metrics[0].Unit,
+			Configs: t.Configs,
+			Rows:    make([]*jsonRow, 0, len(t.Rows)),
+		}
+		for _, row := range t.Rows {
+			r := &jsonRow{
+				Benchmark: row.Benchmark,
+				Metrics:   make([]*jsonMetrics, 0, len(row.Metrics)),
+				PctDelta:  row.PctDelta,
+				Delta:     row.Delta,
+				Note:      row.Note,
+				Change:    row.Change,
+			}
+			for _, m := range row.Metrics {
+				r.Metrics = append(r.Metrics, &jsonMetrics{
+					Values:  m.Values,
+					RValues: m.RValues,
+					Min:     m.Min,
+					Mean:    m.Mean,
+					Max:     m.Max,
+				})
+			}
+			outt.Rows = append(outt.Rows, r)
+		}
+		out = append(out, outt)
+	}
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	return e.Encode(out)
+}
+
+type jsonTable struct {
+	Metric  string
+	Unit    string
+	Configs []string
+	Rows    []*jsonRow
+}
+
+type jsonRow struct {
+	Benchmark string
+	Metrics   []*jsonMetrics
+	PctDelta  float64
+	Delta     string
+	Note      string
+	Change    int
+}
+
+type jsonMetrics struct {
+	Values  []float64 // measured values
+	RValues []float64 // Values with outliers removed
+	Min     float64   // min of RValues
+	Mean    float64   // mean of RValues
+	Max     float64   // max of RValues
 }
 
 func mainImpl() error {
@@ -208,6 +272,7 @@ func mainImpl() error {
 	bench := flag.String("bench", ".", "benchmark to run, default to all")
 	against := flag.String("against", "origin/main", "commitref to benchmark against")
 	benchtime := flag.Duration("benchtime", 100*time.Millisecond, "duration of each benchmark")
+	format := flag.String("format", "text", "format to print; either text or json")
 	count := flag.Int("count", 2, "count to run per attempt")
 	series := flag.Int("series", 3, "series to run the benchmark")
 	// TODO(maruel): This does not seem to help.
@@ -224,6 +289,11 @@ func mainImpl() error {
 	if flag.NArg() != 0 {
 		return errors.New("unexpected argument")
 	}
+	switch *format {
+	case "text", "json":
+	default:
+		return errors.New("unsupported -format")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ch := make(chan os.Signal, 1)
@@ -234,8 +304,20 @@ func mainImpl() error {
 	}()
 
 	oldStats, newStats, err := runBenchmarks(ctx, *against, *pkg, *bench, *benchtime, *count, *series, *nowarm)
-	if err2 := printBenchstat(os.Stdout, oldStats, newStats); err2 != nil {
-		return err2
+	t, err2 := genBenchTables(*against, "HEAD", oldStats, newStats)
+	if err == nil {
+		err = err2
+	}
+	if err != nil {
+		return err
+	}
+	switch *format {
+	case "text":
+		err = printBenchstat(os.Stdout, t)
+	case "json":
+		err = jsonBenchstat(os.Stdout, t)
+	default:
+		err = errors.New("internal error")
 	}
 	return err
 }

@@ -35,7 +35,11 @@ BenchmarkJSONEncode  	  50	  31765634 ns/op	  61.09 MB/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := printBenchstat(buf, old, new); err != nil {
+		t, err := genBenchTables("HEAD~1", "HEAD", old, new)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if err := printBenchstat(buf, t); err != nil {
 			b.Fatal(err)
 		}
 		buf.Reset()
