@@ -27,7 +27,7 @@ github actions.
 Example:
 
 ```
-$ ba -againt HEAD~1
+$ ba -against HEAD~1
 warming up
 go test -bench . -benchtime 100ms -count 1 -run ^$ -cpu 1 ./...
 git checkout HEAD~1
